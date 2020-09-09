@@ -5,6 +5,16 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import AveragePooling2D
+from tensorflow.keras.layers import Dropout, BatchNormalization
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Input
+from sklearn.metrics import classification_report
 import tensorflow as tf
 from tensorflow import keras
 from PIL import Image
@@ -53,12 +63,16 @@ def main():
                 img_path = os.path.join(images_full_dir_name, picture_filename)
                 # print(img_path)
 
-                pil_image = Image.open(img_path)  # RGB
+                # pil_image = Image.open(img_path)  # RGB
 
-                image_array = np.asarray(pil_image, 'uint8')
+                # image_array = np.asarray(pil_image, 'uint8')
 
                 # pil_image = Image.open(img_path).convert('RGB')
                 # im = cv2.imread(img_path) # BGR
+
+                image = tf.keras.preprocessing.image.load_img(img_path)
+                image_array = keras.preprocessing.image.img_to_array(
+                    image, dtype='uint8')
 
                 faces = dom.findall('object')
 
@@ -66,16 +80,18 @@ def main():
                     coordinates = get_box(face)
                     category = get_category(face)
                     # print(category, coordinates)
-                    roi = image_array[coordinates[0]:coordinates[1],
-                                      coordinates[2]:coordinates[3]]
-                    # im = Image.fromarray((roi * 255).astype(np.uint8))
+                    final_image = image_array[coordinates[0]:coordinates[1],
+                                              coordinates[2]:coordinates[3]]
+                    # im = Image.fromarray((final_image * 255).astype(np.uint8))
                     size = (224, 224)
-                    final_image = np.resize(roi, size)
-                    final_image = img_to_array(final_image)
-                    final_image = preprocess_input(final_image)
+                    # final_image = np.resize(final_image, size)
+                    # final_image = img_to_array(final_image)
+                    # print("to array",final_image)
+                    # print("preprocessing",final_image)
                     # final_image.show()
-                    # res = cv2.resize(roi, dsize=size)
-                    # cv2.imshow('Window',res)
+                    final_image = cv2.resize(final_image, dsize=size)
+                    final_image = preprocess_input(final_image)
+                    # cv2.imshow('Window',final_image)
                     # cv2.waitKey(0)
                     # final_image.show()
                     face_images.append(final_image)
@@ -83,22 +99,78 @@ def main():
 
                 # break
 
+    # print(len(face_images), len(face_labels))
+    face_images = np.array(face_images, dtype='float32')
+    # print("face",face_images)
+    face_labels = np.array(face_labels)
+
+    # exit()
+
     lb = LabelEncoder()
     face_labels = lb.fit_transform(face_labels)
     face_labels = to_categorical(face_labels)
 
-    face_images = np.array(face_images, dtype='float32')
-    face_labels = np.array(face_labels)
+    aug = ImageDataGenerator(
+        zoom_range=0.1,
+        rotation_range=25,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        shear_range=0.15,
+        horizontal_flip=True,
+        fill_mode="nearest"
+    )
+
+    baseModel = MobileNetV2(weights="imagenet", include_top=False,
+                            input_tensor=Input(shape=(224, 224, 3)))
+
+    headModel = baseModel.output
+    headModel = AveragePooling2D(pool_size=(7, 7))(headModel)
+    headModel = Flatten(name="flatten")(headModel)
+    headModel = Dense(256, activation="relu")(headModel)
+    headModel = Dropout(0.25)(headModel)
+    headModel = Dense(3, activation="softmax")(headModel)
+
+    model = Model(inputs=baseModel.input, outputs=headModel)
+
+    print(model.input.shape)
+
+    for layer in baseModel.layers:
+        layer.trainable = False
+
+    model.summary()
+
+    INIT_LR = 1e-4
+    EPOCHS = 10
+    BS = 1
 
     (train_x, test_x, train_y, test_y) = train_test_split(face_images,
-                                                          face_labels, test_size=0.2, stratify=face_labels, random_state=3)
-    
-    
+                                                          face_labels, test_size=0.2, stratify=face_labels, random_state=42)
 
+    opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+    model.compile(loss="categorical_crossentropy", optimizer=opt,
+                  metrics=["accuracy"])
+
+    # print(model.input.shape)
+
+    H = model.fit(
+        aug.flow(train_x, train_y, batch_size=BS),
+        steps_per_epoch=len(train_x) // BS,
+        validation_data=(test_x, test_y),
+        validation_steps=len(test_x) // BS,
+        epochs=EPOCHS)
+
+    predIdxs = model.predict(test_x, batch_size=BS)
+
+    predIdxs = np.argmax(predIdxs, axis=1)
+
+    print(classification_report(test_y.argmax(axis=1), predIdxs,
+                                target_names=lb.classes_))
+
+    model.save('model.h5')
 
 
 if __name__ == "__main__":
-    start = time.time()
+    # start = time.time()
     main()
-    end = time.time()
-    print('Execution time:', end - start)
+    # end = time.time()
+    # print('Execution time:', end - start)
