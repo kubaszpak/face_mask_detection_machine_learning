@@ -22,6 +22,8 @@ import numpy as np
 import time
 import cv2
 
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 project_dir = os.path.dirname(os.path.abspath(__file__))
 dataset = 'dataset'
 annotations_dir_name = 'annotations'
@@ -30,6 +32,7 @@ images_dir_name = 'images'
 annotations_full_dir_name = os.path.join(
     project_dir, dataset, annotations_dir_name)
 images_full_dir_name = os.path.join(project_dir, dataset, images_dir_name)
+# categories = ["without_mask","with_mask","mask_weared_incorrect"]
 
 
 def get_box(face):
@@ -64,15 +67,14 @@ def main():
                 # print(img_path)
 
                 # pil_image = Image.open(img_path)  # RGB
-
                 # image_array = np.asarray(pil_image, 'uint8')
 
-                # pil_image = Image.open(img_path).convert('RGB')
-                # im = cv2.imread(img_path) # BGR
+                image_array = cv2.imread(img_path)
+                image_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
 
-                image = tf.keras.preprocessing.image.load_img(img_path)
-                image_array = keras.preprocessing.image.img_to_array(
-                    image, dtype='uint8')
+                # image = tf.keras.preprocessing.image.load_img(img_path)
+                # image_array = keras.preprocessing.image.img_to_array(
+                #     image, dtype='uint8')
 
                 faces = dom.findall('object')
 
@@ -96,11 +98,13 @@ def main():
                     # final_image.show()
                     face_images.append(final_image)
                     face_labels.append(category)
+                    # print(final_image.shape)
 
                 # break
 
     # print(len(face_images), len(face_labels))
     face_images = np.array(face_images, dtype='float32')
+    print(face_images.shape)
     # print("face",face_images)
     face_labels = np.array(face_labels)
 
@@ -120,8 +124,9 @@ def main():
         fill_mode="nearest"
     )
 
-    baseModel = MobileNetV2(weights="imagenet", include_top=False,
-                            input_tensor=Input(shape=(224, 224, 3)))
+    baseModel = MobileNetV2(weights="imagenet", include_top=False, input_shape=(224,224,3))
+
+    #  input_tensor = Input(shape=(224, 224, 3))
 
     headModel = baseModel.output
     headModel = AveragePooling2D(pool_size=(7, 7))(headModel)
@@ -141,7 +146,7 @@ def main():
 
     INIT_LR = 1e-4
     EPOCHS = 10
-    BS = 1
+    BS = 32
 
     (train_x, test_x, train_y, test_y) = train_test_split(face_images,
                                                           face_labels, test_size=0.2, stratify=face_labels, random_state=42)
@@ -166,7 +171,7 @@ def main():
     print(classification_report(test_y.argmax(axis=1), predIdxs,
                                 target_names=lb.classes_))
 
-    model.save('model.h5')
+    model.save('model2.h5')
 
 
 if __name__ == "__main__":
