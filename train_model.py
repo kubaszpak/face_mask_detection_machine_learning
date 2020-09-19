@@ -86,13 +86,13 @@ def main():
                                               coordinates[2]:coordinates[3]]
                     # im = Image.fromarray((final_image * 255).astype(np.uint8))
                     size = (224, 224)
+                    final_image = cv2.resize(final_image, dsize=size)
+                    final_image = preprocess_input(final_image)
                     # final_image = np.resize(final_image, size)
                     # final_image = img_to_array(final_image)
                     # print("to array",final_image)
                     # print("preprocessing",final_image)
                     # final_image.show()
-                    final_image = cv2.resize(final_image, dsize=size)
-                    final_image = preprocess_input(final_image)
                     # cv2.imshow('Window',final_image)
                     # cv2.waitKey(0)
                     # final_image.show()
@@ -114,6 +114,8 @@ def main():
     face_labels = lb.fit_transform(face_labels)
     face_labels = to_categorical(face_labels)
 
+    print(face_labels)
+
     aug = ImageDataGenerator(
         zoom_range=0.1,
         rotation_range=25,
@@ -124,7 +126,8 @@ def main():
         fill_mode="nearest"
     )
 
-    baseModel = MobileNetV2(weights="imagenet", include_top=False, input_shape=(224,224,3))
+    baseModel = MobileNetV2(
+        weights="imagenet", include_top=False, input_shape=(224, 224, 3))
 
     #  input_tensor = Input(shape=(224, 224, 3))
 
