@@ -130,6 +130,12 @@ dmypy.json
 
 # dataset
 dataset
+dataset2
 
 # vscode
 .vscode
+
+# not mine
+model_real_time.py
+face_detector
+mask_detector.model
