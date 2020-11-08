@@ -7,6 +7,8 @@
 <br>
 
 Application detects if a test object is wearing a face mask correctly using Tensorflow, Keras, OpenCV. Also experimenting with PyTorch.
+
+NOTE: Model parameters and layers were copied from Kaggle's website community Notebooks!!!
 <br><br>
 
 ---
